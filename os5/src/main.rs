@@ -54,3 +54,22 @@ pub fn rust_main() -> ! {
     task::run_tasks();
     panic!("Unreachable in rust_main!");
 }
+lazy_static! {
+    pub static ref BATCH_PROCESSING_TASK: UPSafeCell<Vec<Arc<Task>>> =
+        unsafe { UPSafeCell::new(Vec::new()) };
+}
+
+pub fn run_target_task(names: &[&str]) {
+    let mut batch_processing_task = BATCH_PROCESSING_TASK.exclusive_access();
+    for name in names.iter() {
+        batch_processing_task.push(Task::new(*name));
+    }
+
+    for task in batch_processing_task.iter() {
+        add_task(Arc::clone(task))
+    }
+}
+
+pub fn run_usertest() {
+    run_target_task(&["ch5_usertest"]);
+}
