@@ -3,6 +3,13 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 
+use alloc::{sync::Arc, vec::Vec};
+use lazy_static::lazy_static;
+use sync::UPSafeCell;
+use task::add_task;
+
+use crate::task::Task;
+
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
@@ -44,13 +51,33 @@ pub fn rust_main() -> ! {
     logging::init();
     println!("[kernel] Hello, world!");
     mm::init();
+    info!("after mm init!");
     mm::remap_test();
-    task::add_initproc();
-    info!("after initproc!");
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
     loader::list_apps();
-    task::run_tasks();
-    panic!("Unreachable in rust_main!");
+    // task::add_initproc();
+    // info!("after initproc!");
+    run_usertest();
+    task::run_next_task()
+}
+lazy_static! {
+    pub static ref BATCH_PROCESSING_TASK: UPSafeCell<Vec<Arc<Task>>> =
+        unsafe { UPSafeCell::new(Vec::new()) };
+}
+
+pub fn run_target_task(names: &[&str]) {
+    let mut batch_processing_task = BATCH_PROCESSING_TASK.exclusive_access();
+    for name in names.iter() {
+        batch_processing_task.push(Task::new(*name));
+    }
+
+    for task in batch_processing_task.iter() {
+        add_task(Arc::clone(task))
+    }
+}
+
+pub fn run_usertest() {
+    run_target_task(&["ch5_usertest"]);
 }
